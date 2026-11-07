@@ -42,10 +42,12 @@ export function DashboardPage() {
           <Link to="/learn" className="text-link">Begin with the fundamentals <ArrowRight size={15} aria-hidden="true" /></Link>
         </section>
         <section className="key-concept"><Lightbulb size={20} aria-hidden="true" /><div><p className="eyebrow">THE BIG QUESTION</p><h3>Who gets the CPU next?</h3><p>CPU scheduling selects a process from the ready queue. The policy shapes waiting time, responsiveness, and fairness.</p></div></section>
-        <div className="phase-note"><Check size={15} aria-hidden="true" /><span>Phase 6: study the rules, solve missions, and track your progress.</span></div>
+        <div className="phase-note"><Check size={15} aria-hidden="true" /><span>Calculate, compare, learn, and save your scheduling missions.</span></div>
       </aside>
     </div>
     <Link to="/calculator" className="dashboard-bottom"><span><span className="mono">NEXT STEP</span> Set up your first process list</span><ChevronRight size={19} aria-hidden="true" /></Link>
   </>
 }
+
+
 

@@ -8,12 +8,12 @@ import { blankProcess, MAX_CREW, needsProcessPriority } from '../utils/calculato
 import type { FormErrors } from '../utils/calculator'
 import type { CalculatorDraft, ProcessInput } from '../types'
 
-export function ProcessEditor({ draft, errors, onChange }: {
-  draft: CalculatorDraft; errors: FormErrors; onChange: (draft: CalculatorDraft) => void
+export function ProcessEditor({ draft, errors, onChange, metadataMode = false }: {
+  draft: CalculatorDraft; errors: FormErrors; onChange: (draft: CalculatorDraft) => void; metadataMode?: boolean
 }) {
-  const needsPriority = needsProcessPriority(draft)
-  const needsQueue = draft.algorithm === 'MLQ' || draft.algorithm === 'MLFQ'
-  const queues = draft.algorithm === 'MLQ' ? draft.mlqQueues : draft.mlfqLevels
+  const needsPriority = metadataMode || needsProcessPriority(draft)
+  const needsQueue = metadataMode || draft.algorithm === 'MLQ' || draft.algorithm === 'MLFQ'
+  const queues = metadataMode ? Array.from({length:8}, (_,i)=>({level:i+1,policy:'metadata'})) : draft.algorithm === 'MLQ' ? draft.mlqQueues : draft.mlfqLevels
   const update = (id: number, field: 'arrival' | 'burst' | 'priority' | 'queue', value: string) => {
     onChange({ ...draft, processes: draft.processes.map(process => process.id === id ? { ...process, [field]: value } : process) })
   }
@@ -28,7 +28,7 @@ export function ProcessEditor({ draft, errors, onChange }: {
           <th scope="row"><span className="crew-identity" data-process-id={process.id} data-crew-color={getCrewColor(process.id).name}><CrewAvatar processId={process.id} size={29} /><span><strong className="mono">P{process.id}</strong><span className="crew-color-name">{getCrewColor(process.id).name}</span></span></span>{errors[`process.${process.id}.id`] && <span className="field-error">{errors[`process.${process.id}.id`]}</span>}</th>
           <td><NumberField id={`arrival-${process.id}`} label={`P${process.id} arrival time`} value={process.arrival} hiddenLabel error={errors[`process.${process.id}.arrival`]} onChange={value => update(process.id, 'arrival', value)} /></td>
           <td><NumberField id={`burst-${process.id}`} label={`P${process.id} burst time`} value={process.burst} minimum={1} hiddenLabel error={errors[`process.${process.id}.burst`]} onChange={value => update(process.id, 'burst', value)} /></td>
-          {needsPriority && <td>{needsProcessPriority(draft, process) ? <NumberField id={`priority-${process.id}`} label={`P${process.id} priority`} value={process.priority} hiddenLabel error={errors[`process.${process.id}.priority`]} onChange={value => update(process.id, 'priority', value)} /> : <span className="not-required">Not required by this queue</span>}</td>}
+          {needsPriority && <td>{metadataMode || needsProcessPriority(draft, process) ? <NumberField id={`priority-${process.id}`} label={`P${process.id} priority`} value={process.priority} hiddenLabel error={errors[`process.${process.id}.priority`]} onChange={value => update(process.id, 'priority', value)} /> : <span className="not-required">Not required by this queue</span>}</td>}
           {needsQueue && <td><label className="sr-only" htmlFor={`queue-${process.id}`}>P{process.id} queue assignment</label><select id={`queue-${process.id}`} value={process.queue} onChange={event => update(process.id, 'queue', event.target.value)} aria-invalid={!!errors[`process.${process.id}.queue`]} aria-describedby={errors[`process.${process.id}.queue`] ? `queue-${process.id}-error` : undefined}>
             {!queues.some(q => String(q.level) === process.queue) && <option value={process.queue}>Invalid queue {process.queue || '(empty)'}</option>}
             {queues.map(queue => <option key={queue.level} value={queue.level}>Queue {queue.level} · {queue.policy}</option>)}
@@ -48,3 +48,4 @@ export function ProcessEditor({ draft, errors, onChange }: {
     {needsQueue && <p className="crew-input-note">Changing queue count keeps existing assignments. Correct any assignment to a removed queue before running.</p>}
   </Panel>
 }
+

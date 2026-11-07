@@ -52,10 +52,11 @@ export function AppLayout() {
     <dialog ref={help} className="help-dialog" aria-labelledby="help-title">
       <div className="panel-heading"><h2 id="help-title">Your scheduling workspace</h2><button className="icon-button" aria-label="Close help" onClick={() => help.current?.close()}><X size={20} /></button></div>
       <div className="help-body"><BookOpen className="text-blue" size={28} aria-hidden="true" /><p>Start in the Learning Center to explore the eight algorithms from Lecture 5. Use the Calculator to choose an algorithm and prepare a process input draft.</p>
-        <p>The simulator runs all eight verified scheduling policies and displays real process timings and metrics. Load a lecture example or prepare your own crew. The timeline supports event playback, ready-queue snapshots, zoom and image export. Select a process for exact formulas or open the Mission Execution Log for a synchronized walkthrough. Visit the Crewmate Academy for worked lessons and quizzes, or Training Missions to solve and check a problem. Comparisons and saved-result storage remain upcoming.</p>
+        <p>The simulator runs all eight verified scheduling policies and displays real process timings and metrics. Load a lecture example or prepare your own crew. The timeline supports event playback, ready-queue snapshots, zoom and image export. Select a process for exact formulas or open the Mission Execution Log for a synchronized walkthrough. Visit the Crewmate Academy for worked lessons and quizzes, or Training Missions to solve and check a problem. Use Compare Algorithms to run a shared dataset across policies. Mission Files exports reports and saves inputs; Mission Archive restores and recalculates them.</p>
         <Link className="button primary" to="/learn" onClick={() => help.current?.close()}>Open Learning Center <ArrowRight size={16} aria-hidden="true" /></Link>
       </div>
     </dialog>
   </div>
 }
+
 

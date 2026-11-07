@@ -22,8 +22,10 @@ export function Navigation({ onNavigate }: { onNavigate?: () => void }) {
     <div className="sidebar-bottom">
       <div className="lecture-note"><BookOpen size={19} aria-hidden="true" /><p>MISSION BRIEFING<span>Operating Systems · 05</span></p></div>
       <NavLink to="/learn" onClick={onNavigate} className="sidebar-resource">Explore the concepts <ArrowUpRight size={15} aria-hidden="true" /></NavLink>
-      <div className="sidebar-version"><span className="status-dot" /> Phase 6 · Training Academy<span className="mono">v0.1</span></div>
+      <div className="sidebar-version"><span className="status-dot" /> Final · Scheduling Lab<span className="mono">v1.0</span></div>
     </div>
   </>
 }
+
+
 

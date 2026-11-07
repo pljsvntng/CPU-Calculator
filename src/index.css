@@ -468,4 +468,4 @@ dialog::backdrop { background: #0f172a88; }
   .empty-state { padding: 35px 20px; }
   .app-footer { margin: 0 18px; padding: 17px 0; font-size: 9px; }
 }
-@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }

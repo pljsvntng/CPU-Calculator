@@ -5,6 +5,7 @@ import { defineConfig } from 'vitest/config'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  build: { rolldownOptions: { output: { strictExecutionOrder: true, codeSplitting: { groups: [{ name: 'analytics', test: /node_modules[\\/](recharts|victory-vendor|d3-|redux|react-redux|reselect|immer|use-sync-external-store)/ }] } } } },
   test: {
     environment: 'jsdom',
     setupFiles: ['./src/tests/setup.ts'],

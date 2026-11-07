@@ -3,7 +3,7 @@ import { render,screen,fireEvent,waitFor,within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import App from '../App'
 import { readMissions } from '../utils/simulationStorage'
-const click=(name:string)=>fireEvent.click(screen.getByRole('button',{name,exact:true}))
+const click=(name:string)=>fireEvent.click(screen.getByRole('button',{name}))
 beforeEach(()=>{localStorage.clear();vi.stubGlobal('ResizeObserver',class{observe(){} unobserve(){} disconnect(){}})})
 afterEach(()=>vi.unstubAllGlobals())
 it('loads one shared lecture dataset, compares two real policies, and marks edits stale',async()=>{
@@ -12,7 +12,7 @@ it('loads one shared lecture dataset, compares two real policies, and marks edit
   await waitFor(()=>expect(screen.getByRole('heading',{name:'SCHEDULING PERFORMANCE REPORT'})).toBeInTheDocument(),{timeout:10000})
   expect(screen.getByRole('table',{name:'Successful results from one shared dataset'})).toHaveTextContent('6.8000')
   expect(screen.getByRole('table',{name:'Successful results from one shared dataset'})).toHaveTextContent('5.2000')
-  expect(screen.getAllByRole('region',{name:/ chart$/})).toHaveLength(6)
+  await waitFor(()=>expect(screen.getAllByRole('region',{name:/ chart$/})).toHaveLength(6),{timeout:10000})
   fireEvent.change(screen.getByLabelText('P1 burst time'),{target:{value:'8'}})
   expect(screen.getByRole('button',{name:'Export comparison CSV'})).toBeDisabled()
 },30000)

@@ -3,6 +3,7 @@
 .comparison-configs details { padding:16px;border:1px solid var(--border);border-radius:6px;min-width:0; }
 .training-panel textarea { display:block;width:100%;min-width:0;padding:12px;background:var(--surface);color:var(--text);border:1px solid var(--border);border-radius:6px;font:12px var(--font-mono);margin:10px 0; }
 .comparison-winner { background:var(--blue-bg); }
+.lesson-card h2,.lesson-card p { overflow-wrap:anywhere; }
 .comparison-stale { opacity:.75; }
 .comparison-svg { overflow:auto; }
 .comparison-svg svg { width:100%;min-width:600px; }

@@ -5,7 +5,7 @@ export interface SavedMission { version: 1; id: string; name: string; created: s
 export function readMissions(storage?: Pick<Storage, 'getItem'>): { missions: SavedMission[]; warning: string } {
   try {
     const raw = (storage ?? localStorage).getItem(MISSIONS_KEY)
-    if (!raw) return { missions: [], warning: '' }
+    if (raw === null) return { missions: [], warning: '' }
     if (raw.length > 2_000_000) throw new Error('Archive is too large.')
     const list: unknown = JSON.parse(raw)
     if (!Array.isArray(list) || list.length > 100) throw new Error('Invalid archive.')

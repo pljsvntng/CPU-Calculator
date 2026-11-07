@@ -7,6 +7,9 @@ export const ANSWER_TOLERANCE = 0.00005
 export function parseStudentNumber(raw: string, integer: boolean): { value: number | null; status: 'valid' | 'missing' | 'invalid' } {
   if (!raw.trim()) return { value: null, status: 'missing' }
   const value = Number(raw)
+  // Number() can round a long fractional spelling to an integer. Reject that
+  // spelling before numerical equality can award credit to an inaccurate answer.
+  if (integer && /\.[0-9]*[1-9]/.test(raw.trim())) return { value: null, status: 'invalid' }
   if (raw.length > 40 || !/^(?:\d+(?:\.\d*)?|\.\d+)$/.test(raw.trim()) || !Number.isFinite(value) || value < 0 || (integer && !Number.isSafeInteger(value))) return { value: null, status: 'invalid' }
   return { value, status: 'valid' }
 }
@@ -28,6 +31,7 @@ export function checkGantt(problem: PracticeProblem, answers: PracticeAnswers, e
   const parsed: { processId: string | null; startTime: number; endTime: number }[] = []
   for (const [index, row] of answers.segments.entries()) {
     const start = parseStudentNumber(row.start, false), end = parseStudentNumber(row.end, false)
+    if ([row.start,row.end].some(raw=>Number.isInteger(Number(raw)) && /\.[0-9]*[1-9]/.test(raw.trim()))) return { ...base, status: 'invalid', explanation: `Interval ${index + 1}: the fractional endpoint rounds to an integer in JavaScript. Enter the exact timestamp; rounded scheduling boundaries are not accepted.` }
     if (start.status === 'missing' || end.status === 'missing' || !row.processId) return { ...base, status: 'missing', explanation: `Interval ${index + 1}: process, start and end are required.` }
     const process = problem.processes.find(process => process.id === row.processId)
     if (start.status !== 'valid' || end.status !== 'valid' || end.value! <= start.value! || end.value! > Number.MAX_SAFE_INTEGER || (!process && row.processId !== 'IDLE')) return { ...base, status: 'invalid', explanation: `Interval ${index + 1}: use a known process or IDLE and finite non-negative endpoints with end > start. Decimal display subdivisions are allowed; actual scheduling boundaries must still match.` }
