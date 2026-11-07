@@ -1,0 +1,9 @@
+import { beforeEach,expect,it } from 'vitest'
+import { datasetJson,parseDataset } from '../utils/datasetImportExport'
+import { newMission,readMissions,writeMissions,MISSIONS_KEY } from '../utils/simulationStorage'
+import { generatePracticeProblem } from '../utils/practiceGenerator'
+beforeEach(()=>localStorage.clear())
+it('saves, reloads, renames, duplicates and deletes input-only records while preserving progress',()=>{const d=parseDataset(datasetJson(generatePracticeProblem({algorithm:'RR',difficulty:'easy'})));localStorage.setItem('cpu-scheduling-lab.learning.v1','keep');const m=newMission(d,'First');writeMissions([m]);expect(readMissions().missions[0]).toEqual(m);writeMissions([{...m,name:'Renamed'},newMission(d,'Copy')]);expect(readMissions().missions).toHaveLength(2);writeMissions([]);expect(localStorage.getItem('cpu-scheduling-lab.learning.v1')).toBe('keep')})
+it('rejects unsupported versions and extra properties',()=>{expect(()=>parseDataset('{"version":2}')).toThrow('version');const d=JSON.parse(datasetJson(generatePracticeProblem({algorithm:'FCFS',difficulty:'easy'})));d.processes[0].code='bad';expect(()=>parseDataset(JSON.stringify(d))).toThrow('Unsupported process')})
+it('handles corruption and duplicate IDs without overwriting stored data',()=>{localStorage.setItem(MISSIONS_KEY,'broken');expect(readMissions().warning).not.toBe('');expect(localStorage.getItem(MISSIONS_KEY)).toBe('broken');const m=newMission(parseDataset(datasetJson(generatePracticeProblem({algorithm:'FCFS',difficulty:'easy'}))),'Test');expect(()=>writeMissions([m,m])).toThrow('Invalid')})
+it('reports storage quota and read failures',()=>{expect(()=>writeMissions([],{setItem:()=>{throw Error('quota')}})).toThrow('quota');expect(readMissions({getItem:()=>{throw Error('blocked')}}).warning).not.toBe('')})
