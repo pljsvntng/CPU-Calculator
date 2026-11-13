@@ -13,7 +13,8 @@ export type PriorityDirection = 'lower-first' | 'higher-first'
 export type QueueAlgorithm = Exclude<AlgorithmId, 'MLQ' | 'MLFQ'>
 export type QueuePolicy = { algorithm: Exclude<QueueAlgorithm, 'RR'> } | { algorithm: 'RR'; quantum: number }
 export interface FixedQueue { level: number; priority: number; policy: QueuePolicy }
-export interface FeedbackLevel { level: number; policy: { algorithm: 'RR'; quantum: number } | { algorithm: 'SJF' | 'FCFS' } }
+export type DemotionRule = { kind: 'quantum' } | { kind: 'service'; budget: number } | { kind: 'dispatches'; count: number } | { kind: 'none' }
+export interface FeedbackLevel { level: number; policy: QueuePolicy; demotion?: DemotionRule }
 export interface PriorityPromotion { time: number; processId: string; targetQueueLevel: number }
 export interface SimulationLimits {
   maxTransitions?: number
@@ -29,6 +30,7 @@ export type SchedulingConfig =
   | (BaseSchedulingOptions & { algorithm: 'MLQ'; queues: readonly FixedQueue[]; interqueuePreemption?: boolean; priorityDirection?: PriorityDirection })
   | (BaseSchedulingOptions & {
     algorithm: 'MLFQ'
+    priorityDirection?: PriorityDirection
     levels: readonly FeedbackLevel[]
     interqueuePreemption?: boolean
     agingInterval?: number
@@ -57,7 +59,7 @@ export interface ScheduledProcess extends SchedulingProcess {
 }
 export type SchedulingEventType =
   | 'process-arrived' | 'process-selected' | 'process-started' | 'process-preempted'
-  | 'quantum-expired' | 'process-requeued' | 'process-demoted' | 'process-promoted'
+  | 'cpu-budget-exhausted' | 'quantum-expired' | 'process-requeued' | 'process-demoted' | 'process-promoted'
   | 'process-completed' | 'cpu-idle' | 'priority-boost' | 'promotion-skipped'
 export interface ReadyQueueSnapshot { queueLevel: number; processIds: string[] }
 export interface SchedulingEvent {

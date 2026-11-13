@@ -20,7 +20,7 @@ beforeEach(() => {
 describe('workspace navigation', () => {
   it.each([
     ['Dashboard', 'CPU SCHEDULING LAB'],
-    ['Calculator', 'CPU SCHEDULING SIMULATOR'],
+    ['Calculator', 'CPU Scheduling Calculator'],
     ['Compare Algorithms', 'MISSION PERFORMANCE COMPARISON'],
     ['Learning Center', 'CREWMATE ACADEMY'],
     ['Practice Mode', 'TRAINING MISSIONS'],
@@ -108,13 +108,13 @@ describe('calculator input foundation', { timeout: 15_000 }, () => {
   it('loads only example inputs and resets the process crew to a blank draft', async () => {
     const user = userEvent.setup()
     renderApp('/calculator')
-    await user.click(screen.getByRole('button', { name: 'LOAD MISSION' }))
+    await user.click(screen.getByRole('button', { name: 'LOAD EXAMPLE' }))
     expect(screen.getAllByRole('button', { name: /Remove process P/ })).toHaveLength(5)
     expect(screen.getByRole('spinbutton', { name: 'P1 burst time' })).toHaveValue(5)
     expect(screen.getByRole('status', { name: 'Input source' })).toHaveTextContent('Sample mission inputs loaded')
     expect(screen.getByText('No calculated results')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Start Simulation (Calculate CPU Schedule)' })).toBeEnabled()
-    await user.click(screen.getByRole('button', { name: 'RESET CREW' }))
+    await user.click(screen.getByRole('button', { name: 'RESET' }))
     expect(screen.getAllByRole('button', { name: /Remove process P/ })).toHaveLength(1)
     expect(screen.getByRole('spinbutton', { name: 'P1 arrival time' })).toHaveValue(null)
     expect(screen.getByRole('spinbutton', { name: 'P1 burst time' })).toHaveValue(null)
@@ -125,7 +125,7 @@ describe('calculator input foundation', { timeout: 15_000 }, () => {
   it('keeps remaining crewmate colors tied to their IDs after removing a process', async () => {
     const user = userEvent.setup()
     renderApp('/calculator')
-    await user.click(screen.getByRole('button', { name: 'LOAD MISSION' }))
+    await user.click(screen.getByRole('button', { name: 'LOAD EXAMPLE' }))
     await user.click(screen.getByRole('button', { name: 'Remove process P1' }))
     expect(screen.getByText('Blue').closest('[data-process-id]')).toHaveAttribute('data-process-id', '2')
     expect(screen.getByText('Green').closest('[data-process-id]')).toHaveAttribute('data-process-id', '3')

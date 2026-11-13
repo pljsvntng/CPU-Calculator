@@ -118,7 +118,7 @@ describe('interactive calculator integration', { timeout: 30_000 }, () => {
     await screen.findByText('CALCULATION VERIFIED')
   })
 
-  it('configures feedback presets, RR levels, aging and boosting and rejects an unsupported intermediate policy', async () => {
+  it('configures feedback presets, RR levels, aging and boosting and supports non-RR intermediate policies', async () => {
     const user = openCalculator()
     await loadLecture(user, 27)
     await user.click(screen.getByRole('button', { name: 'RR 1 / RR 2 / SJF' }))
@@ -130,8 +130,8 @@ describe('interactive calculator integration', { timeout: 30_000 }, () => {
     await replace(user, 'Priority boost interval', '10')
     await user.selectOptions(screen.getByLabelText('Number of queue levels'), '4')
     expect(screen.getByLabelText('Queue 3 scheduling policy')).toHaveValue('SJF')
-    expect(screen.getByLabelText('Queue 3 scheduling policy')).toHaveAttribute('aria-invalid', 'true')
-    expect(start()).toBeDisabled()
+    expect(screen.getByLabelText('Queue 3 scheduling policy')).toHaveAttribute('aria-invalid', 'false')
+    expect(start()).toBeEnabled()
     await user.selectOptions(screen.getByLabelText('Queue 3 scheduling policy'), 'RR')
     await replace(user, 'Queue 3 time quantum', '3')
     expect(start()).toBeEnabled()
@@ -199,7 +199,7 @@ describe('interactive calculator integration', { timeout: 30_000 }, () => {
   it('shows engine errors without storing a successful result', async () => {
     vi.spyOn(client, 'runSimulation').mockRejectedValueOnce(new Error('Engine rejected this mission.'))
     const user = openCalculator()
-    await user.click(screen.getByRole('button', { name: 'LOAD MISSION' }))
+    await user.click(screen.getByRole('button', { name: 'LOAD EXAMPLE' }))
     await user.click(start())
     expect(await screen.findByRole('alert')).toHaveTextContent('Engine rejected this mission.')
     expect(screen.getByRole('status', { name: 'Calculation status' })).toHaveTextContent('No new successful calculation')
@@ -212,7 +212,7 @@ describe('interactive calculator integration', { timeout: 30_000 }, () => {
       return { ...result, metrics: { ...result.metrics, averageWaitingTime: -1 } }
     })
     const user = openCalculator()
-    await user.click(screen.getByRole('button', { name: 'LOAD MISSION' }))
+    await user.click(screen.getByRole('button', { name: 'LOAD EXAMPLE' }))
     await user.click(start())
     expect(await screen.findByRole('alert')).toHaveTextContent('Simulation failed')
     expect(screen.queryByText('CALCULATION VERIFIED')).not.toBeInTheDocument()
@@ -227,7 +227,7 @@ describe('interactive calculator integration', { timeout: 30_000 }, () => {
       return new Promise(done => { resolve = done })
     })
     const user = openCalculator()
-    await user.click(screen.getByRole('button', { name: 'LOAD MISSION' }))
+    await user.click(screen.getByRole('button', { name: 'LOAD EXAMPLE' }))
     await user.click(start())
     expect(start()).toBeDisabled()
     await replace(user, 'P1 burst time', '6')

@@ -17,8 +17,8 @@ export function createCalculatorDraft(): CalculatorDraft {
     ],
     mlfqLevels: [
       { level: 1, policy: 'RR', priority: '0', quantum: '2' },
-      { level: 2, policy: 'RR', priority: '1', quantum: '3' },
-      { level: 3, policy: 'SJF', priority: '2', quantum: '2' },
+      { level: 2, policy: 'RR', priority: '1', quantum: '4' },
+      { level: 3, policy: 'FCFS', priority: '2', quantum: '2' },
     ],
     mlqPreemption: true, mlfqPreemption: true, agingEnabled: false, agingInterval: '10',
     boostEnabled: false, boostInterval: '20', source: null,
@@ -26,12 +26,13 @@ export function createCalculatorDraft(): CalculatorDraft {
 }
 export function needsProcessPriority(draft: CalculatorDraft, process?: ProcessInput) {
   if (draft.algorithm === 'NPP' || draft.algorithm === 'PP') return true
-  if (draft.algorithm !== 'MLQ') return false
+  if (draft.algorithm !== 'MLQ' && draft.algorithm !== 'MLFQ') return false
+  if (draft.algorithm === 'MLFQ') return draft.mlfqLevels.some(q => q.policy === 'NPP' || q.policy === 'PP')
   return draft.mlqQueues.some(queue => (!process || String(queue.level) === process.queue) && (queue.policy === 'NPP' || queue.policy === 'PP'))
 }
 export function resizeQueues(queues: QueueDraft[], count: number, feedback: boolean): QueueDraft[] {
   return Array.from({ length: count }, (_, index) => queues[index] ?? {
-    level: index + 1, policy: feedback && index === count - 1 ? 'SJF' : 'RR', priority: String(index), quantum: '2',
+    level: index + 1, policy: feedback && index === count - 1 ? 'FCFS' : 'RR', priority: String(index), quantum: '2',
   })
 }
 
@@ -57,13 +58,15 @@ export function prepareRequest(draft: CalculatorDraft): { request: SchedulingReq
       })),
     }; break
     case 'MLFQ': {
-      const levels = draft.mlfqLevels.map((queue, index) => {
-        if (index < draft.mlfqLevels.length - 1 && queue.policy !== 'RR') errors[`mlfq.${queue.level}.policy`] = 'Intermediate feedback levels must use Round Robin.'
-        if (!['RR', 'SJF', 'FCFS'].includes(queue.policy)) errors[`mlfq.${queue.level}.policy`] = 'The feedback engine supports RR, SJF, or FCFS only.'
-        return { level: queue.level, policy: policy(queue, `mlfq.${queue.level}`) }
+      const levels = draft.mlfqLevels.map(queue => {
+        const key = `mlfq.${queue.level}`
+        const kind = queue.demotion ?? (queue.policy === 'RR' ? 'quantum' : 'none')
+        const demotion = kind === 'service' ? { kind, budget: number(queue.serviceBudget ?? '', 1, `${key}.serviceBudget`, 'CPU service budget') } as const
+          : kind === 'dispatches' ? { kind, count: number(queue.dispatchLimit ?? '', 1, `${key}.dispatchLimit`, 'Dispatch count') } as const
+          : { kind } as { kind: 'quantum' | 'none' }
+        return { level: queue.level, policy: policy(queue, key), ...(queue.demotion === undefined ? {} : { demotion }) }
       })
-      config = { algorithm: 'MLFQ', interqueuePreemption: draft.mlfqPreemption,
-        levels: levels as Extract<SchedulingConfig, { algorithm: 'MLFQ' }>['levels'],
+      config = { algorithm: 'MLFQ', ...(draft.priorityDirection === 'higher-first' ? { priorityDirection: 'higher-first' } : {}), interqueuePreemption: draft.mlfqPreemption, levels,
         ...(draft.agingEnabled ? { agingInterval: number(draft.agingInterval, 1, 'agingInterval', 'Aging interval') } : {}),
         ...(draft.boostEnabled ? { boostInterval: number(draft.boostInterval, 1, 'boostInterval', 'Boost interval') } : {}),
       }
@@ -110,7 +113,7 @@ export function draftFromRequest(request: SchedulingRequest, previous = createCa
 export function applyConfiguration(previous: CalculatorDraft, config: SchedulingConfig): CalculatorDraft {
   const draft: CalculatorDraft = { ...previous, algorithm: config.algorithm }
   if (config.algorithm === 'RR') draft.quantum = String(config.quantum)
-  if (config.algorithm === 'NPP' || config.algorithm === 'PP' || config.algorithm === 'MLQ') draft.priorityDirection = config.priorityDirection ?? 'lower-first'
+  if (config.algorithm === 'NPP' || config.algorithm === 'PP' || config.algorithm === 'MLQ' || config.algorithm === 'MLFQ') draft.priorityDirection = config.priorityDirection ?? 'lower-first'
   const queueDraft = (level: number, value: QueuePolicy, priority = level - 1): QueueDraft => ({
     level, policy: value.algorithm, priority: String(priority), quantum: value.algorithm === 'RR' ? String(value.quantum) : '2',
   })
@@ -119,7 +122,7 @@ export function applyConfiguration(previous: CalculatorDraft, config: Scheduling
     draft.mlqPreemption = config.interqueuePreemption ?? true
   }
   if (config.algorithm === 'MLFQ') {
-    draft.mlfqLevels = config.levels.map(level => queueDraft(level.level, level.policy))
+    draft.mlfqLevels = config.levels.map(level => ({ ...queueDraft(level.level, level.policy), demotion: level.demotion?.kind, serviceBudget: level.demotion?.kind === 'service' ? String(level.demotion.budget) : '', dispatchLimit: level.demotion?.kind === 'dispatches' ? String(level.demotion.count) : '' }))
     draft.mlfqPreemption = config.interqueuePreemption ?? true
     draft.agingEnabled = config.agingInterval !== undefined
     draft.agingInterval = String(config.agingInterval ?? 10)

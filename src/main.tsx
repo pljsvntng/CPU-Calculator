@@ -20,3 +20,5 @@ createRoot(document.getElementById('root')!).render(
     <AppErrorBoundary><BrowserRouter><App /></BrowserRouter></AppErrorBoundary>
   </StrictMode>,
 )
+
+import './styles/mobile.css'

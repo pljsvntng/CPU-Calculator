@@ -1,5 +1,5 @@
 # Scheduling engine
 
-Phase 2 exposes `schedule(processes, config)` in `scheduler.ts`. Pure TypeScript policy modules provide all eight algorithms; the event-driven simulation kernel handles time, copied process state, execution histories, chronological Gantt data, educational event snapshots, and derived metrics.
+The public pure TypeScript API is `schedule(processes, config)` in `scheduler.ts`. Runtime validation precedes immutable, event-driven simulation. Single-policy and multilevel schedulers share one clock, execution history, event log, and metric calculation; the React application invokes them through a worker.
 
-No React dependency or UI integration is included. See [API, assumptions, validation, and lecture audit](../../docs/phase-2-engine.md). The Phase 1 UI remains intact until its integration phase.
+See [original engine audit](../../docs/phase-2-engine.md) and [current configurable MLFQ and mobile redesign](../../docs/mobile-mlfq-redesign.md). The latter supersedes the original restrictions on feedback policies.

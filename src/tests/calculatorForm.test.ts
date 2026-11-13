@@ -47,11 +47,11 @@ describe('form-to-engine boundary', () => {
     expect(prepareRequest({ ...draft, processes: [...draft.processes, ...draft.processes] }).request).toBeNull()
     expect(prepareRequest({ ...draft, processes: [{ ...draft.processes[0], id: 0 }] }).request).toBeNull()
   })
-  it('preserves policies when resizing and reports unsupported intermediate feedback policies', () => {
+  it('preserves supported non-RR intermediate policies when resizing', () => {
     const draft = { ...validDraft(), algorithm: 'MLFQ' as const }
     draft.mlfqLevels = resizeQueues(draft.mlfqLevels, 4, true)
-    expect(draft.mlfqLevels[2].policy).toBe('SJF')
-    expect(prepareRequest(draft).errors['mlfq.3.policy']).toMatch(/Round Robin/)
+    expect(draft.mlfqLevels[2].policy).toBe('FCFS')
+    expect(prepareRequest(draft).request).not.toBeNull()
     draft.mlfqLevels[2].policy = 'RR'
     expect(prepareRequest(draft).request).not.toBeNull()
   })

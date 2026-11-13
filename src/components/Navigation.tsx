@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom'
-import { BookOpen, ArrowUpRight } from 'lucide-react'
+import { BookOpen, ArrowUpRight, Ellipsis } from 'lucide-react'
 import { CrewAvatar } from './CrewAvatar'
 import { navigation } from '../data/navigation'
 
@@ -29,3 +29,14 @@ export function Navigation({ onNavigate }: { onNavigate?: () => void }) {
 
 
 
+
+export function MobileNavigation({ onMore }: { onMore: () => void }) {
+  const labels: Record<string, string> = { '/': 'Home', '/calculator': 'Calculator', '/learn': 'Lessons', '/practice': 'Practice' }
+  return <nav className="mobile-bottom-nav" aria-label="Primary mobile navigation">
+    {['/', '/calculator', '/learn', '/practice'].map(path => {
+      const { icon: Icon } = navigation.find(item => item.to === path)!
+      return <NavLink key={path} to={path} end={path === '/'} className={({ isActive }) => isActive ? 'active' : ''}><Icon size={20} aria-hidden="true" /><span>{labels[path]}</span></NavLink>
+    })}
+    <button type="button" onClick={onMore} aria-label="More navigation" aria-haspopup="dialog"><Ellipsis size={20} aria-hidden="true" /><span>More</span></button>
+  </nav>
+}

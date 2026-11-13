@@ -14,6 +14,7 @@ import { GanttTimeAxis } from './GanttTimeAxis'
 import { GanttTooltip } from './GanttTooltip'
 import { GanttControls } from './GanttControls'
 import { GanttPlayback } from './GanttPlayback'
+import { QueueTimelines } from './QueueTimelines'
 import { MissionStatus } from './MissionStatus'
 
 export function SchedulingGanttChart({ result, outdated = false }: { result: SchedulingResult | null; outdated?: boolean }) {
@@ -125,6 +126,7 @@ function TimelineWorkspace({ result, outdated, playback, selectedProcessId }: { 
       <GanttControls zoom={zoom} fit={fit} expanded={expanded} exporting={exporting} disabled={outdated}
         onZoom={factor => setZoom(previous => Math.min(16, Math.max(0.25, previous * factor)))} onReset={() => { setFit(false); setZoom(1) }} onFit={() => { setFit(true); setZoom(1); if (scroller.current) scroller.current.scrollLeft = 0; setScrollLeft(0) }} onFullscreen={() => void fullscreen()} onExport={type => void exportImage(type)} />
       <div className="timeline-meta"><div><strong>{result.algorithm}</strong><span>{algorithms.find(a => a.id === result.algorithm)?.name}</span></div><span className="mono">0–{result.metrics.observationEndTime} CPU UNITS · {details.length} INTERVALS{fit && width > available ? ' · SCROLL TO EXPLORE' : ''}</span></div>
+      {result.algorithm === 'MLFQ' && <p className="queue-chart-guide">One CPU, one clock. The combined timeline is authoritative. The queue charts below share its scale, playhead, and horizontal scroll. Muted blocks mean another queue is running; IDLE means no process is ready. Tap a colored block for details.</p>}
       <div className="gantt-scroll" ref={scroller} tabIndex={0} role="region" aria-label="Execution timeline, scroll horizontally to explore" onScroll={event => setScrollLeft(event.currentTarget.scrollLeft)}>
         <svg className="scheduling-gantt-svg" width={width} height={GANTT_HEIGHT} viewBox={`0 0 ${width} ${GANTT_HEIGHT}`} role="group" aria-label={`${result.algorithm} Gantt chart`}>
           <title>{result.algorithm} CPU execution timeline</title><desc>Proportional intervals from time 0 to {result.metrics.observationEndTime}. Focus or tap a block to inspect it. Narrow intervals can also be selected with the interval navigator.</desc>
@@ -136,6 +138,7 @@ function TimelineWorkspace({ result, outdated, playback, selectedProcessId }: { 
           <g aria-label={`Playhead at ${playback.time}`} pointerEvents="none"><line x1={scale.x(playback.time)} x2={scale.x(playback.time)} y1={GANTT_Y - 20} y2={GANTT_Y + 78} stroke="#facc15" strokeWidth={2} /><path d={`M${scale.x(playback.time) - 5} ${GANTT_Y - 23}h10l-5 8Z`} fill="#facc15" /></g>
           <text x={scrollLeft + 20} y={215} fill="#bcc9db" fontFamily="monospace" fontSize={10}>TIME / CPU units · narrow labels available in interval inspector</text>
         </svg>
+        <QueueTimelines result={result} visible={visible} width={width} x={scale.x} times={times} scrollLeft={scrollLeft} available={available} time={playback.time} selected={selected} onInspect={inspect} />
       </div>
       <div className="timeline-legend" aria-label="Process color legend">{result.processes.map(process => <span key={process.id}><i style={{ background: processColor(process.id).value }} /><strong className="mono">{process.id}</strong></span>)}{result.metrics.totalIdleTime > 0 && <span><i style={{ background: '#68758a' }} />IDLE</span>}</div>
       {selectedProcessId !== undefined && <p className="selected-crew-note">Cyan outline: {selectedProcessId ? `selected crewmate ${selectedProcessId}` : 'no crewmate selected'} · yellow: active CPU interval · white: interval inspector.</p>}

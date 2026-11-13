@@ -360,7 +360,7 @@ describe('input validation and explicit resource failures', () => {
       { algorithm: 'MLQ', queues: [{ level: 1, priority: 0, policy: { algorithm: { toString: () => 'FCFS' } } }] },
       { algorithm: 'MLQ', queues: [{ level: 1, priority: 0, policy: { algorithm: 'RR', quantum: 0 } }] },
       { algorithm: 'MLQ', queues: [{ level: 1, priority: 0, policy: { algorithm: 'FCFS' } }, { level: 1, priority: 1, policy: { algorithm: 'FCFS' } }] },
-      { ...MLFQ_PRESET_2_3, levels: [{ level: 1, policy: { algorithm: 'SJF' } }, { level: 2, policy: { algorithm: 'FCFS' } }] },
+      { ...MLFQ_PRESET_2_3, levels: [{ level: 1, policy: { algorithm: 'SJF' }, demotion: { kind: 'quantum' } }, { level: 2, policy: { algorithm: 'FCFS' } }] },
       { ...MLFQ_PRESET_2_3, agingInterval: 0 }, { ...MLFQ_PRESET_2_3, boostInterval: Infinity },
       { ...MLFQ_PRESET_2_3, priorityPromotions: [{ time: 1, processId: 'unknown', targetQueueLevel: 1 }] },
       { ...MLFQ_PRESET_2_3, priorityPromotions: [{ time: 1, processId: 'P1', targetQueueLevel: 4 }] },

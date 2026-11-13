@@ -1,3 +1,4 @@
+import { demotionDescription } from '../../utils/feedbackRules'
 import type { SchedulingRequest } from '../../utils/calculator'
 
 export function SchedulingDataset({ request, source }: { request: SchedulingRequest; source: string }) {
@@ -11,6 +12,6 @@ export function SchedulingDataset({ request, source }: { request: SchedulingRequ
       {config.algorithm === 'RR' && <li>Quantum: {config.quantum}. Boundary arrivals enter before requeueing unfinished work.</li>}
       {(config.algorithm === 'MLQ' || config.algorithm === 'MLFQ') && <li>Interqueue preemption: {config.interqueuePreemption === false ? 'deferred until the current turn boundary' : 'strict; a higher queue can interrupt'}.</li>}
       {config.algorithm === 'MLQ' && config.queues.map(q => <li key={q.level}>Q{q.level}: queue rank {q.priority} (lower first), {q.policy.algorithm}{q.policy.algorithm === 'RR' && `, q = ${q.policy.quantum}`}. Fixed membership.</li>)}
-      {config.algorithm === 'MLFQ' && <><li>Full unfinished RR budget demotes one level. Higher-level interruption retains unused quantum.</li>{config.levels.map(q => <li key={q.level}>Q{q.level}: {q.policy.algorithm}{q.policy.algorithm === 'RR' && `, q = ${q.policy.quantum}`}.</li>)}<li>Aging: {config.agingInterval ?? 'off'}; global boost: {config.boostInterval ?? 'off'}; scheduled promotions: {config.priorityPromotions?.length ?? 0}.</li></>}
+      {config.algorithm === 'MLFQ' && <><li>Queue rules apply to one shared CPU timeline. Interruptions retain unused quantum and service budget.</li>{config.levels.map(q => <li key={q.level}>Q{q.level}: {q.policy.algorithm}{q.policy.algorithm === 'RR' && `, q = ${q.policy.quantum}`}. {demotionDescription(q)}.</li>)}<li>Aging: {config.agingInterval ?? 'off'}; global boost: {config.boostInterval ?? 'off'}; scheduled promotions: {config.priorityPromotions?.length ?? 0}.</li></>}
     </ul></div></div>
 }

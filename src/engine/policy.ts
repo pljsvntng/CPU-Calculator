@@ -11,6 +11,9 @@ export interface RuntimeProcess {
   arrived: boolean
   readySince: number
   budgetRemaining: number | null
+  serviceRemaining: number | null
+  levelDispatches: number
+  queueEntryTime: number
   executionHistory: InternalSegment[]
 }
 export interface InternalSegment {
@@ -32,6 +35,7 @@ export interface RuntimeQueue {
   level: number
   priority: number
   policy: SchedulingPolicy
+  demotion?: import('../types/scheduling').DemotionRule
   ready: RuntimeProcess[]
 }
 export interface SimulationPlan {

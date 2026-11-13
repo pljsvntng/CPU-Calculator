@@ -28,6 +28,9 @@ export interface QueueDraft {
   policy: import('./scheduling').QueueAlgorithm
   priority: string
   quantum: string
+  demotion?: import('./scheduling').DemotionRule['kind']
+  serviceBudget?: string
+  dispatchLimit?: string
 }
 export interface CalculatorDraft {
   algorithm: AlgorithmId

@@ -10,3 +10,9 @@ export function createMissionExample(): ProcessInput[] {
     { id: 5, arrival: '6', burst: '4', priority: '1', queue: '1' },
   ]
 }
+
+/** Staggered arrivals and long bursts demonstrate all three feedback levels. */
+export function createFeedbackExample(): ProcessInput[] {
+  const arrivals = [0, 3, 7, 10, 18], bursts = [12, 3, 9, 2, 7]
+  return createMissionExample().map((process, index) => ({ ...process, arrival: String(arrivals[index]), burst: String(bursts[index]) }))
+}

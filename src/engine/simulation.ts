@@ -23,7 +23,7 @@ export function simulate(processes: SchedulingProcess[], config: SchedulingConfi
   const states: RuntimeProcess[] = processes.map(input => ({
     input, remainingTime: input.burstTime, firstStartTime: null, completionTime: null, executedTime: 0,
     currentQueueLevel: input.queueLevel ?? 1, arrived: false, readySince: input.arrivalTime,
-    budgetRemaining: null, executionHistory: [],
+    budgetRemaining: null, serviceRemaining: null, levelDispatches: 0, queueEntryTime: input.arrivalTime, executionHistory: [],
   }))
   const arrivals = [...states].sort(byArrival)
   const byId = new Map(states.map(process => [process.input.id, process]))
@@ -56,13 +56,32 @@ export function simulate(processes: SchedulingProcess[], config: SchedulingConfi
     const queue = queueByLevel.get(process.currentQueueLevel)!
     queue.ready = queue.ready.filter(item => item !== process)
   }
+  const resetLevel = (process: RuntimeProcess) => {
+    process.budgetRemaining = null
+    process.serviceRemaining = null
+    process.levelDispatches = 0
+    process.queueEntryTime = time
+  }
+  const demote = (process: RuntimeProcess, reason: string) => {
+    const target = plan.feedback?.demotionTarget(process.currentQueueLevel)
+    if (target !== undefined && target !== process.currentQueueLevel) {
+      const old = process.currentQueueLevel
+      process.currentQueueLevel = target
+      resetLevel(process)
+      emit('process-demoted', process, `${process.input.id} moves from level ${old} to ${target}: ${reason}. Remaining burst: ${process.remainingTime}.`)
+      return true
+    }
+    return false
+  }
   const suspend = (reason: string) => {
     const interrupted = running!
     running = null
-    // A higher queue interrupts a turn without consuming its unused RR budget.
-    enqueue(interrupted, queueByLevel.get(interrupted.currentQueueLevel)!.policy.algorithm === 'RR')
     emit('process-preempted', interrupted, reason)
-    emit('process-requeued', interrupted, `${interrupted.input.id} retains ${interrupted.remainingTime} CPU units${interrupted.budgetRemaining === null ? '' : ` and ${interrupted.budgetRemaining} units of its current quantum`}.`)
+    const rule = queueByLevel.get(interrupted.currentQueueLevel)!.demotion
+    const moved = rule?.kind === 'dispatches' && interrupted.levelDispatches >= rule.count
+      ? demote(interrupted, `configured ${rule.count} dispatches consumed; interrupted dispatch ends`) : false
+    enqueue(interrupted, !moved && queueByLevel.get(interrupted.currentQueueLevel)!.policy.algorithm === 'RR')
+    emit('process-requeued', interrupted, `${interrupted.input.id} retains ${interrupted.remainingTime} CPU units${interrupted.budgetRemaining === null ? '' : ` and ${interrupted.budgetRemaining} units of its current quantum`}. CPU service budgets also retain unused time across interruptions.`)
   }
   const promote = (process: RuntimeProcess, target: number, reason: string) => {
     if (process.completionTime !== null || target >= process.currentQueueLevel) {
@@ -75,7 +94,7 @@ export function simulate(processes: SchedulingProcess[], config: SchedulingConfi
       emit('process-preempted', process, `${reason}: the running turn ends for promotion.`)
     } else removeReady(process)
     process.currentQueueLevel = target
-    process.budgetRemaining = null
+    resetLevel(process)
     enqueue(process)
     emit('process-promoted', process, `${reason}: ${process.input.id} moves from level ${oldLevel} to ${target} with a fresh level budget.`)
   }
@@ -118,18 +137,23 @@ export function simulate(processes: SchedulingProcess[], config: SchedulingConfi
       enqueue(process)
       emit('process-arrived', process, `${process.input.id} arrives at time ${time} and enters level ${process.currentQueueLevel}.`)
     }
-    if (running && running.budgetRemaining === 0) {
+    if (running && (running.budgetRemaining === 0 || running.serviceRemaining === 0)) {
       const expired = running
       running = null
-      emit('quantum-expired', expired, `${expired.input.id} exhausts its level ${expired.currentQueueLevel} quantum with ${expired.remainingTime} units left.`)
-      const demotionTarget = plan.feedback?.demotionTarget(expired.currentQueueLevel)
-      if (demotionTarget !== undefined && demotionTarget !== expired.currentQueueLevel) {
-        expired.currentQueueLevel = demotionTarget
-        emit('process-demoted', expired, `${expired.input.id} is demoted to level ${expired.currentQueueLevel} after using its full quantum.`)
-      }
+      const quantumExpired = expired.budgetRemaining === 0
+      const serviceExpired = expired.serviceRemaining === 0
+      const rule = queueByLevel.get(expired.currentQueueLevel)!.demotion
+      if (quantumExpired) emit('quantum-expired', expired, `${expired.input.id} exhausts its level ${expired.currentQueueLevel} quantum with ${expired.remainingTime} units left.`)
+      if (serviceExpired) emit('cpu-budget-exhausted', expired, `${expired.input.id} exhausts its configured CPU service budget in level ${expired.currentQueueLevel}.`)
+      const reason = serviceExpired ? 'CPU service budget exhausted'
+        : rule?.kind === 'quantum' ? 'full RR quantum consumed'
+        : rule?.kind === 'dispatches' && expired.levelDispatches >= rule.count ? `${rule.count} dispatches consumed` : null
+      const moved = reason ? demote(expired, reason) : false
+      if (serviceExpired && !moved) expired.queueEntryTime = time
       expired.budgetRemaining = null
+      if (serviceExpired) expired.serviceRemaining = null
       enqueue(expired)
-      emit('process-requeued', expired, `${expired.input.id} rejoins the tail after all arrivals at time ${time}.`)
+      emit('process-requeued', expired, `${expired.input.id} rejoins the tail of level ${expired.currentQueueLevel} after all arrivals at time ${time}.`)
     }
     while (nextPromotion < promotions.length && promotions[nextPromotion].time === time) {
       const promotion = promotions[nextPromotion++]
@@ -150,7 +174,7 @@ export function simulate(processes: SchedulingProcess[], config: SchedulingConfi
       for (const process of active) {
         const oldLevel = process.currentQueueLevel
         process.currentQueueLevel = plan.feedback!.topLevel
-        process.budgetRemaining = null
+        resetLevel(process)
         enqueue(process)
         if (oldLevel > 1) emit('process-promoted', process, `Periodic boost moves ${process.input.id} from level ${oldLevel} to level 1.`)
       }
@@ -175,6 +199,8 @@ export function simulate(processes: SchedulingProcess[], config: SchedulingConfi
         const first = running.firstStartTime === null
         if (first) running.firstStartTime = time
         if (running.budgetRemaining === null && queue.policy.quantum !== undefined) running.budgetRemaining = queue.policy.quantum
+        if (running.serviceRemaining === null && queue.demotion?.kind === 'service') running.serviceRemaining = queue.demotion.budget
+        running.levelDispatches++
         dispatch++
         wasIdle = false
         emit('process-selected', running, `${queue.policy.algorithm} selects ${running.input.id} from level ${queue.level}, using its documented tie rules.`)
@@ -198,6 +224,7 @@ export function simulate(processes: SchedulingProcess[], config: SchedulingConfi
     }
     let nextTime = Math.min(future(time, running.remainingTime), arrivalTime, promotionTime, nextBoost)
     if (running.budgetRemaining !== null) nextTime = Math.min(nextTime, future(time, running.budgetRemaining))
+    if (running.serviceRemaining !== null) nextTime = Math.min(nextTime, future(time, running.serviceRemaining))
     if (feedback?.agingInterval) {
       for (const queue of plan.queues) for (const process of queue.ready) {
         if (process.currentQueueLevel > 1) nextTime = Math.min(nextTime, future(process.readySince, feedback.agingInterval))
@@ -209,6 +236,7 @@ export function simulate(processes: SchedulingProcess[], config: SchedulingConfi
     running.remainingTime -= elapsed
     running.executedTime += elapsed
     if (running.budgetRemaining !== null) running.budgetRemaining -= elapsed
+    if (running.serviceRemaining !== null) running.serviceRemaining -= elapsed
     time = nextTime
   }
   const output = states.map(process => {

@@ -1,3 +1,4 @@
+import { demotionDescription } from './feedbackRules'
 import type { QueuePolicy, SchedulingEvent, SchedulingResult } from '../types/scheduling'
 
 function policyRule(policy: QueuePolicy, direction: 'lower-first' | 'higher-first') {
@@ -14,7 +15,7 @@ export function explainEvent(result: SchedulingResult, index: number) {
   const event = result.events[index]
   if (!event) return null
   const config = result.config
-  const ended = ['process-completed', 'process-preempted', 'quantum-expired', 'process-demoted'].includes(event.type)
+  const ended = ['process-completed', 'process-preempted', 'cpu-budget-exhausted', 'quantum-expired', 'process-demoted'].includes(event.type)
   const interval = result.segments.find(segment => ended
     ? segment.processId === event.processId && segment.endTime === event.timestamp
     : segment.startTime <= event.timestamp && event.timestamp < segment.endTime && (segment.isIdle ? event.type === 'cpu-idle' : segment.processId === event.runningProcessId))
@@ -29,7 +30,8 @@ export function explainEvent(result: SchedulingResult, index: number) {
   } else if (config.algorithm === 'MLFQ') {
     policy = config.levels.find(queue => queue.level === interval?.queueLevel)?.policy
     notes.push(`MLFQ levels: ${config.levels.map(level => `Q${level.level}: ${level.policy.algorithm}${level.policy.algorithm === 'RR' ? ` q=${level.policy.quantum}` : ''}`).join('; ')}.`)
-    notes.push('Using a full RR quantum while unfinished demotes one level, except at the final level. Higher-level interruptions retain unused quantum. Promotions and boosts reset level budgets.')
+    notes.push('Each queue applies its configured demotion rule. RR defaults to full-quantum demotion, which demotes one level; non-RR defaults to none. Service budgets accumulate CPU time, not waiting time. Dispatch limits are checked when a turn ends. Interrupted budgets are retained; promotion and boost reset them. The last level requeues instead of demoting.')
+    for (const level of config.levels) notes.push(`Q${level.level}: ${demotionDescription(level)}.`)
     notes.push(config.interqueuePreemption === false ? 'Interqueue interruption is deferred until the active scheduling boundary.' : 'Higher-priority queues can interrupt lower levels.')
     if (config.agingInterval) notes.push(`Configured waiting-time aging interval: ${config.agingInterval}. Actual promotions appear as process-promoted events.`)
     if (config.boostInterval) notes.push(`Configured priority boost interval: ${config.boostInterval}. Actual boosts appear as priority-boost events.`)

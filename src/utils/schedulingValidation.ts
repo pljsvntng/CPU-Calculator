@@ -12,9 +12,9 @@ function integer(value: unknown, minimum: number, name: string): asserts value i
 function keys(value: Record<string, unknown>, allowed: string[], name: string) {
   for (const key of Object.keys(value)) if (!allowed.includes(key)) fail(`Unsupported ${name} option: ${key}.`)
 }
-function policy(value: unknown, name: string, feedback: boolean, last: boolean) {
+function policy(value: unknown, name: string) {
   record(value, name)
-  const allowed = feedback ? (last ? ['RR', 'SJF', 'FCFS'] : ['RR']) : ['FCFS', 'SJF', 'NPP', 'SRTF', 'PP', 'RR']
+  const allowed = ['FCFS', 'SJF', 'NPP', 'SRTF', 'PP', 'RR']
   if (typeof value.algorithm !== 'string' || !allowed.includes(value.algorithm)) fail(`${name} has an unsupported algorithm.`)
   keys(value, value.algorithm === 'RR' ? ['algorithm', 'quantum'] : ['algorithm'], name)
   if (value.algorithm === 'RR') integer(value.quantum, 1, `${name} quantum`)
@@ -28,7 +28,7 @@ export function validateSchedulingInput(processes: unknown, config: unknown): as
   const allowed: Record<string, string[]> = {
     FCFS: [], SJF: [], SRTF: [], RR: ['quantum'], NPP: ['priorityDirection'], PP: ['priorityDirection'],
     MLQ: ['queues', 'interqueuePreemption', 'priorityDirection'],
-    MLFQ: ['levels', 'interqueuePreemption', 'agingInterval', 'boostInterval', 'priorityPromotions'],
+    MLFQ: ['priorityDirection', 'levels', 'interqueuePreemption', 'agingInterval', 'boostInterval', 'priorityPromotions'],
   }
   const algorithm = config.algorithm
   if (typeof algorithm !== 'string' || !Object.hasOwn(allowed, algorithm)) fail('Unsupported scheduling algorithm.')
@@ -50,12 +50,21 @@ export function validateSchedulingInput(processes: unknown, config: unknown): as
     queueLevels.clear()
     for (const [index, definition] of definitions.entries()) {
       record(definition, `Queue ${index + 1}`)
-      keys(definition, algorithm === 'MLQ' ? ['level', 'priority', 'policy'] : ['level', 'policy'], 'queue')
+      keys(definition, algorithm === 'MLQ' ? ['level', 'priority', 'policy'] : ['level', 'policy', 'demotion'], 'queue')
       integer(definition.level, 1, 'Queue level')
       if (queueLevels.has(definition.level)) fail('Queue levels must be unique.')
       queueLevels.add(definition.level)
       if (algorithm === 'MLQ') integer(definition.priority, 0, 'Queue priority')
-      policy(definition.policy, `Queue ${definition.level} policy`, algorithm === 'MLFQ', definition.level === definitions.length)
+      policy(definition.policy, `Queue ${definition.level} policy`)
+      if (algorithm === 'MLFQ' && definition.demotion !== undefined) {
+        const rule = definition.demotion
+        record(rule, 'Demotion rule')
+        if (!['quantum', 'service', 'dispatches', 'none'].includes(rule.kind as string)) fail('Unsupported demotion rule.')
+        keys(rule, rule.kind === 'service' ? ['kind', 'budget'] : rule.kind === 'dispatches' ? ['kind', 'count'] : ['kind'], 'demotion')
+        if (rule.kind === 'quantum' && (definition.policy as { algorithm: string }).algorithm !== 'RR') fail('Quantum demotion requires Round Robin.')
+        if (rule.kind === 'service') integer(rule.budget, 1, 'CPU service budget')
+        if (rule.kind === 'dispatches') integer(rule.count, 1, 'Dispatch count')
+      }
       if (['NPP', 'PP'].includes((definition.policy as { algorithm: string }).algorithm)) priorityLevels.add(definition.level)
     }
     for (let level = 1; level <= definitions.length; level++) if (!queueLevels.has(level)) fail('Queue levels must be contiguous, starting at 1.')
@@ -83,7 +92,7 @@ export function validateSchedulingInput(processes: unknown, config: unknown): as
       if (!queueLevels.has(process.queueLevel)) fail(`${process.id} has an invalid queue assignment.`)
     }
     if (algorithm === 'MLQ' && process.queueLevel === undefined) fail(`${process.id} requires a fixed queueLevel for MLQ.`)
-    if (algorithm === 'NPP' || algorithm === 'PP' || priorityLevels.has(process.queueLevel as number)) integer(process.priority, 0, `${process.id} priority`)
+    if (algorithm === 'NPP' || algorithm === 'PP' || (algorithm === 'MLFQ' ? priorityLevels.size > 0 : priorityLevels.has(process.queueLevel as number))) integer(process.priority, 0, `${process.id} priority`)
     burstSum += process.burstTime
     maxArrival = Math.max(maxArrival, process.arrivalTime)
   }

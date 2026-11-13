@@ -1,9 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
+import type { KeyboardEvent } from 'react'
 import { Link, Outlet, useLocation } from 'react-router-dom'
 import { ChevronRight, CircleHelp, Menu, Moon, Sun, X, BookOpen, ArrowRight } from 'lucide-react'
-import { Brand, Navigation } from '../components/Navigation'
+import { Brand, Navigation, MobileNavigation } from '../components/Navigation'
 import { navigation } from '../data/navigation'
 import { applyTheme, getInitialTheme } from '../utils/theme'
+
+function trapDialogFocus(event: KeyboardEvent<HTMLDialogElement>) {
+  if (event.key !== 'Tab') return
+  const controls = [...event.currentTarget.querySelectorAll<HTMLElement>('a[href], button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex="0"]')]
+  const first = controls[0], last = controls.at(-1)
+  if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus() }
+  else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus() }
+}
 
 export function AppLayout() {
   const location = useLocation()
@@ -26,7 +35,7 @@ export function AppLayout() {
   return <div className="app-shell">
     <a href="#main-content" className="skip-link">Skip to content</a>
     <aside className="sidebar"><Brand /><Navigation /></aside>
-    <dialog ref={drawer} className="nav-drawer" aria-label="Mobile navigation">
+    <dialog onKeyDown={trapDialogFocus} ref={drawer} className="nav-drawer" aria-label="Mobile navigation">
       <div className="drawer-heading"><Brand onNavigate={() => drawer.current?.close()} /><button className="icon-button" aria-label="Close navigation" onClick={() => drawer.current?.close()}><X size={21} /></button></div>
       <Navigation onNavigate={() => drawer.current?.close()} />
     </dialog>
@@ -49,7 +58,8 @@ export function AppLayout() {
       <main id="main-content" ref={main} tabIndex={-1} className="main-content"><Outlet /></main>
       <footer className="app-footer"><span>CPU SCHEDULING LAB <span className="footer-dot">/</span> Your processes. Your mission.</span><span>LECTURE 05 <span className="footer-dot">/</span> INTERACTIVE SIMULATOR</span></footer>
     </div>
-    <dialog ref={help} className="help-dialog" aria-labelledby="help-title">
+    <MobileNavigation onMore={() => drawer.current?.showModal()} />
+    <dialog onKeyDown={trapDialogFocus} ref={help} className="help-dialog" aria-labelledby="help-title">
       <div className="panel-heading"><h2 id="help-title">Your scheduling workspace</h2><button className="icon-button" aria-label="Close help" onClick={() => help.current?.close()}><X size={20} /></button></div>
       <div className="help-body"><BookOpen className="text-blue" size={28} aria-hidden="true" /><p>Start in the Learning Center to explore the eight algorithms from Lecture 5. Use the Calculator to choose an algorithm and prepare a process input draft.</p>
         <p>The simulator runs all eight verified scheduling policies and displays real process timings and metrics. Load a lecture example or prepare your own crew. The timeline supports event playback, ready-queue snapshots, zoom and image export. Select a process for exact formulas or open the Mission Execution Log for a synchronized walkthrough. Visit the Crewmate Academy for worked lessons and quizzes, or Training Missions to solve and check a problem. Use Compare Algorithms to run a shared dataset across policies. Mission Files exports reports and saves inputs; Mission Archive restores and recalculates them.</p>
