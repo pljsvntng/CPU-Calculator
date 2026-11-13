@@ -25,7 +25,7 @@ describe('final grading and resource regressions',()=>{
     const r=executeSimulation({config:{algorithm:'RR',quantum:1},processes:[{id:'P1',arrivalTime:0,burstTime:2001,originalInputOrder:0}]})
     expect(()=>buildReport([r])).toThrow('2,000')
     const {container}=render(<ComparisonOverview result={r} domainEnd={2001}/>)
-    expect(container.querySelector('svg')).toBeNull();expect(screen.getByText(/2,001 intervals/)).toHaveTextContent('Inspect Timeline')
+    expect(container.querySelector('svg')).toBeNull();expect(screen.getByText(/2,001 unit intervals/)).toHaveTextContent('Inspect Timeline')
   })
   it('treats an empty persisted archive as corruption without overwriting it',()=>{let raw='';const loaded=readMissions({getItem:()=>raw});expect(loaded.warning).not.toBe('');expect(raw).toBe('');raw='[]';expect(readMissions({getItem:()=>raw}).warning).toBe('')})
   it('offers recovery for a rendering failure without clearing stored records',()=>{

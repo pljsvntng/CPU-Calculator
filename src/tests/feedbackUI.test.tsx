@@ -4,23 +4,24 @@ import { MemoryRouter } from 'react-router-dom'
 import { expect, it, vi } from 'vitest'
 import { QueueTimelines } from '../components/gantt/QueueTimelines'
 import { schedule } from '../engine/scheduler'
-import { segmentDetails } from '../utils/simulationView'
+import { unitTimeline } from '../utils/ganttUnits'
 import App from '../App'
 
 it('projects every busy interval into exactly one aligned queue view with tap and keyboard inspection', async () => {
   const result=schedule([{id:'P1',arrivalTime:2,burstTime:12,originalInputOrder:0},{id:'P2',arrivalTime:9,burstTime:1,originalInputOrder:1}],{algorithm:'MLFQ',levels:[{level:1,policy:{algorithm:'RR',quantum:2}},{level:2,policy:{algorithm:'RR',quantum:4}},{level:3,policy:{algorithm:'FCFS'}}]})
   const inspect=vi.fn(), user=userEvent.setup()
-  const {container}=render(<QueueTimelines result={result} visible={segmentDetails(result)} width={800} x={time=>38+time*32} times={[...new Set(result.segments.flatMap(s=>[s.startTime,s.endTime]))]} scrollLeft={0} available={390} time={9} selected={0} onInspect={inspect} />)
+  const units=unitTimeline(result).slice(0,unitTimeline(result).count)
+  const {container}=render(<QueueTimelines result={result} visible={units} width={800} x={time=>38+time*32} times={[...new Set(result.segments.flatMap(s=>[s.startTime,s.endTime]))]} scrollLeft={0} available={390} time={9} selected={0} onInspect={inspect} />)
   expect(container.querySelectorAll('.queue-timeline')).toHaveLength(3)
   const rendered=[...container.querySelectorAll('[data-queue-interval]')].map(e=>({processId:e.getAttribute('data-process'),startTime:Number(e.getAttribute('data-start')),endTime:Number(e.getAttribute('data-end')),queueLevel:Number(e.getAttribute('data-queue-interval'))})).sort((a,b)=>a.startTime-b.startTime)
-  expect(rendered).toEqual(result.segments.filter(s=>!s.isIdle).map(({processId,startTime,endTime,queueLevel})=>({processId,startTime,endTime,queueLevel})))
+  expect(rendered).toEqual(units.filter(s=>!s.isIdle).map(({processId,startTime,endTime,queueLevel})=>({processId,startTime,endTime,queueLevel})))
   for(const row of container.querySelectorAll('.queue-timeline')) {
     const blocks=[...row.querySelectorAll('g[data-start]')]
-    expect(blocks.map(e=>Number(e.querySelector('rect')!.getAttribute('x')))).toEqual(result.segments.map(s=>38+s.startTime*32))
+    expect(blocks.map(e=>Number(e.querySelector('rect')!.getAttribute('x')))).toEqual(units.map(s=>38+s.startTime*32))
     expect(row.textContent).toContain('IDLE')
   }
-  const block=screen.getByRole('button',{name:'P1 · Q2: 4–8, duration 4'})
-  await user.click(block); expect(inspect).toHaveBeenCalledWith(2)
+  const block=screen.getByRole('button',{name:'P1 · Q2: 4–5, duration 1'})
+  await user.click(block); expect(inspect).toHaveBeenCalledWith(4)
   block.focus();await user.keyboard('{Enter}');expect(inspect).toHaveBeenCalledTimes(2)
 })
 it('supports all policies and explicit budgets in calculator queues, preserves inputs, and recovers reset data',async()=>{

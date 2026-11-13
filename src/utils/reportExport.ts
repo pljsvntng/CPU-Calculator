@@ -1,3 +1,5 @@
+import { processColor } from './simulationView'
+import { unitTimeline } from './ganttUnits'
 import type { SchedulingResult } from '../types/scheduling'
 import { jsPDF } from 'jspdf'
 import { resultCalculationText } from './resultFormatting'
@@ -5,6 +7,7 @@ import { comparisonMetrics } from './comparisonEngine'
 export function buildReport(results: SchedulingResult[], generated = new Date()) {
   if (!results.length) throw new Error('Calculate a successful result first.')
   if (results.length > 8 || results.reduce((sum,r)=>sum+r.segments.length,0)>2000) throw new Error('PDF reports support up to eight results and 2,000 total intervals. Export CSV or SVG for larger schedules.')
+  if (results.reduce((sum, r) => sum + unitTimeline(r).count, 0) > 2000) throw new Error('Per-unit PDF charts support up to 2,000 total time-unit blocks. Use the interactive timeline, SVG or CSV for larger schedules.')
   const workload = (r: SchedulingResult) => JSON.stringify(r.processes.map(p=>[p.id,p.arrivalTime,p.burstTime,p.originalInputOrder]))
   if (results.some(r=>workload(r)!==workload(results[0]))) throw new Error('A comparison report requires the same process workload for every algorithm.')
   const doc = new jsPDF(), width = 178
@@ -46,18 +49,22 @@ export function buildReport(results: SchedulingResult[], generated = new Date())
       if (y > 245) { doc.addPage(); y = 22; line(inputHeader) }
       line(`${p.id} | ${p.arrivalTime} | ${p.burstTime} | ${p.priority ?? '-'} | ${p.queueLevel ?? '-'}`)
     })
-    line('Gantt chart / exact interval strips', 14)
-    if (y > 245) { doc.addPage(); y = 22 }
-    line(`Proportional overview: 0 - ${r.metrics.observationEndTime} CPU units`, 9)
-    r.segments.forEach(s=>{
-      const x=16+width*s.startTime/r.metrics.observationEndTime, w=width*s.duration/r.metrics.observationEndTime
-      doc.setFillColor(s.isIdle?180:218,s.isIdle?180:231,s.isIdle?180:252);doc.rect(x,y,w,12,'FD')
-      if(w>10){doc.setFontSize(6);doc.text(s.processId??'IDLE',x+1,y+7)}
-    });y+=20
-    // Paginated interval strips retain every process and exact endpoint even for dense timelines.
-    for (let i = 0; i < r.segments.length; i += 4) {
+    line('Gantt chart / per-time-unit execution strips', 14)
+    line('Each cell is one CPU unit; neutral cells mean IDLE. Queue membership is retained.', 9)
+    const units = unitTimeline(r)
+    for (let i = 0; i < units.count; i += 4) {
       if (y > 250) { doc.addPage(); y = 22 }
-      r.segments.slice(i, i + 4).forEach((s, j) => { doc.setDrawColor(100); doc.rect(16 + j * 44, y, 44, 15); doc.setFontSize(8); doc.text(`${s.processId ?? 'IDLE'}${s.queueLevel ? ` Q${s.queueLevel}` : ''}`, 18 + j * 44, y + 6); doc.text(`${s.startTime} - ${s.endTime}`, 18 + j * 44, y + 12) }); y += 22
+      units.slice(i, i + 4).forEach((s, j) => {
+        doc.setDrawColor(100)
+        const color = s.isIdle ? '#68758a' : processColor(s.processId!).value
+        const tint = (offset: number) => Math.round((parseInt(color.slice(offset, offset + 2), 16) + 255) / 2)
+        doc.setFillColor(tint(1), tint(3), tint(5))
+        doc.rect(16 + j * 44, y, 44 * s.duration, 15, 'FD')
+        doc.setFontSize(8)
+        doc.text(`${s.processId ?? 'IDLE'}${s.queueLevel ? ` Q${s.queueLevel}` : ''}`, 18 + j * 44, y + 6)
+        doc.text(`${s.startTime} - ${s.endTime}`, 18 + j * 44, y + 12)
+      })
+      y += 22
     }
     line('Complete results and mathematical solutions', 14)
     for (const text of resultCalculationText(r).split('\n')) line(text)

@@ -1,3 +1,4 @@
+import { unitTimeline } from '../utils/ganttUnits'
 import { act, fireEvent, render, renderHook, screen, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { SchedulingGanttChart } from '../components/gantt/SchedulingGanttChart'
@@ -14,7 +15,7 @@ const fcfs = () => schedule(workload([0, 2, 4], [5, 3, 4]), { algorithm: 'FCFS' 
 afterEach(() => { vi.restoreAllMocks(); vi.unstubAllGlobals(); vi.useRealTimers() })
 
 describe('engine-driven SVG rendering', () => {
-  it.each(['FCFS', 'SJF', 'NPP', 'SRTF', 'PP', 'RR', 'MLQ', 'MLFQ'] as const)('renders every %s interval with its real timestamps, scale and boundaries', algorithm => {
+  it.each(['FCFS', 'SJF', 'NPP', 'SRTF', 'PP', 'RR', 'MLQ', 'MLFQ'] as const)('renders every %s time unit with its real timestamps, scale and boundaries', algorithm => {
     const fixture = lectureInputExamples.find(example => example.config.algorithm === algorithm)!
     const result = schedule(fixture.processes, fixture.config)
     const { container } = render(<SchedulingGanttChart result={result} />)
@@ -22,8 +23,11 @@ describe('engine-driven SVG rendering', () => {
     const svg = screen.getByRole('group', { name: `${algorithm} Gantt chart` })
     const scale = ganttScale(0, result.metrics.observationEndTime, Number(svg.getAttribute('width')))
     const segments = container.querySelectorAll('[data-gantt-segment]')
-    expect(segments).toHaveLength(result.segments.length)
-    result.segments.forEach((segment, index) => {
+    const units = unitTimeline(result)
+    expect(segments.length).toBeLessThanOrEqual(units.count)
+    const navigator = screen.getByLabelText('Inspect interval')
+    units.slice(0, units.count).forEach((segment, index) => {
+      fireEvent.change(navigator, { target: { value: String(index + 1) } })
       const node = container.querySelector(`[data-gantt-segment="${index}"]`)!
       expect(node).toHaveAttribute('data-start', String(segment.startTime))
       expect(node).toHaveAttribute('data-end', String(segment.endTime))
@@ -36,11 +40,12 @@ describe('engine-driven SVG rendering', () => {
     })
   })
 
-  it('gives the requested FCFS workload proportional 5:3:4 widths, never equal widths', () => {
+  it('gives FCFS equal unit cells while preserving total 5:3:4 execution widths', () => {
     const { container } = render(<SchedulingGanttChart result={fcfs()} />)
     const widths = [...container.querySelectorAll('.segment-block')].map(rect => Number(rect.getAttribute('width')))
-    expect(widths[0] / widths[1]).toBeCloseTo(5 / 3)
-    expect(widths[2] / widths[1]).toBeCloseTo(4 / 3)
+    expect(widths).toHaveLength(12)
+    expect(new Set(widths).size).toBe(1)
+    expect(container.querySelectorAll('[data-process="P1"]').length / container.querySelectorAll('[data-process="P2"]').length).toBeCloseTo(5 / 3)
   })
 
   it('renders equal durations with equal widths', () => {
@@ -49,46 +54,44 @@ describe('engine-driven SVG rendering', () => {
     expect(new Set([...container.querySelectorAll('.segment-block')].map(rect => rect.getAttribute('width'))).size).toBe(1)
   })
 
-  it('shows the exact 0–3 and 7–10 idle intervals and their neutral fill', () => {
+  it('splits both idle intervals into neutral one-unit cells', () => {
     const result = schedule(workload([3, 10], [4, 2]), { algorithm: 'FCFS' })
     const { container } = render(<SchedulingGanttChart result={result} />)
     const idle = container.querySelectorAll('[data-process="IDLE"]')
-    expect([...idle].map(node => [node.getAttribute('data-start'), node.getAttribute('data-end')])).toEqual([['0', '3'], ['7', '10']])
+    expect([...idle].map(node => [node.getAttribute('data-start'), node.getAttribute('data-end')])).toEqual([['0','1'], ['1','2'], ['2','3'], ['7','8'], ['8','9'], ['9','10']])
     expect(idle[0].querySelector('.segment-block')).toHaveAttribute('fill', '#68758a')
     fireEvent.click(idle[0])
     expect(screen.getByRole('region', { name: 'Interval details' })).toHaveTextContent('No process is ready during this interval.')
   })
 
-  it('preserves all five requested SRTF execution turns and resumed process colors', () => {
+  it('preserves SRTF ownership and resumed process colors in all fourteen unit cells', () => {
     const result = schedule(workload([0, 1, 2], [8, 4, 2]), { algorithm: 'SRTF' })
     const { container } = render(<SchedulingGanttChart result={result} />)
     const turns = [...container.querySelectorAll('[data-gantt-segment]')]
-    expect(turns.map(node => [node.getAttribute('data-process'), node.getAttribute('data-start'), node.getAttribute('data-end')])).toEqual([
-      ['P1', '0', '1'], ['P2', '1', '2'], ['P3', '2', '4'], ['P2', '4', '7'], ['P1', '7', '14'],
-    ])
-    expect(turns[0].querySelector('rect')?.getAttribute('fill')).toBe(turns[4].querySelector('rect')?.getAttribute('fill'))
-    expect(turns[1].querySelector('rect')?.getAttribute('fill')).toBe(turns[3].querySelector('rect')?.getAttribute('fill'))
+    expect(turns.map(node => [node.getAttribute('data-process'), node.getAttribute('data-start'), node.getAttribute('data-end')])).toEqual(['P1','P2','P3','P3','P2','P2','P2','P1','P1','P1','P1','P1','P1','P1'].map((id,index)=>[id,String(index),String(index+1)]))
+    expect(turns[0].querySelector('rect')?.getAttribute('fill')).toBe(turns[7].querySelector('rect')?.getAttribute('fill'))
+    expect(turns[1].querySelector('rect')?.getAttribute('fill')).toBe(turns[4].querySelector('rect')?.getAttribute('fill'))
   })
 
   it('supports pointer, keyboard and touch-style clicks with actual interval details', () => {
     const result = schedule(workload([0, 1], [5, 2]), { algorithm: 'RR', quantum: 2 })
     const { container } = render(<SchedulingGanttChart result={result} />)
-    const second = container.querySelector('[data-gantt-segment="1"]')!
+    const second = container.querySelector('[data-gantt-segment="2"]')!
     fireEvent.focus(second)
     const inspector = within(screen.getByRole('region', { name: 'Interval details' }))
     expect(inspector.getByText('Start Time').nextElementSibling).toHaveTextContent('2')
-    expect(inspector.getByText('End Time').nextElementSibling).toHaveTextContent('4')
+    expect(inspector.getByText('End Time').nextElementSibling).toHaveTextContent('3')
     expect(inspector.getByText('Original Burst Time').nextElementSibling).toHaveTextContent('2')
-    expect(inspector.getByText('Remaining After Interval').nextElementSibling).toHaveTextContent('0')
+    expect(inspector.getByText('Remaining After Interval').nextElementSibling).toHaveTextContent('1')
     fireEvent.keyDown(second, { key: 'ArrowRight' })
-    expect(screen.getByLabelText('Inspect interval')).toHaveValue(3)
-    expect(container.querySelector('[data-gantt-segment="2"]')).toHaveFocus()
-    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' })
     expect(screen.getByLabelText('Inspect interval')).toHaveValue(4)
+    expect(container.querySelector('[data-gantt-segment="3"]')).toHaveFocus()
+    fireEvent.keyDown(document.activeElement!, { key: 'ArrowRight' })
+    expect(screen.getByLabelText('Inspect interval')).toHaveValue(5)
     fireEvent.click(container.querySelector('[data-gantt-segment="0"]')!)
-    expect(inspector.getByText('Remaining After Interval').nextElementSibling).toHaveTextContent('3')
+    expect(inspector.getByText('Remaining After Interval').nextElementSibling).toHaveTextContent('4')
     fireEvent.pointerMove(second, { pointerType: 'mouse' })
-    expect(inspector.getByText('Remaining After Interval').nextElementSibling).toHaveTextContent('0')
+    expect(inspector.getByText('Remaining After Interval').nextElementSibling).toHaveTextContent('1')
   })
 
   it('changes visual zoom without mutating result data and restores/reset fits', () => {
@@ -97,7 +100,7 @@ describe('engine-driven SVG rendering', () => {
     const svg = screen.getByRole('group', { name: 'FCFS Gantt chart' })
     const original = Number(svg.getAttribute('width'))
     fireEvent.click(screen.getByRole('button', { name: 'Zoom In' }))
-    expect(Number(svg.getAttribute('width'))).toBe(original * 2)
+    expect(Number(svg.getAttribute('width'))).toBe((original - 76) * 2 + 76)
     fireEvent.click(screen.getByRole('button', { name: 'Zoom Out' }))
     expect(Number(svg.getAttribute('width'))).toBe(original)
     fireEvent.click(screen.getByRole('button', { name: 'Fit to Screen' }))
@@ -111,7 +114,7 @@ describe('engine-driven SVG rendering', () => {
     const result = schedule(workload([0, 10000], [1, 1]), { algorithm: 'FCFS' })
     render(<SchedulingGanttChart result={result} />)
     fireEvent.click(screen.getByRole('button', { name: 'Fit to Screen' }))
-    fireEvent.change(screen.getByLabelText('Inspect interval'), { target: { value: '3' } })
+    fireEvent.change(screen.getByLabelText('Inspect interval'), { target: { value: '10001' } })
     expect(screen.getByRole('region', { name: 'Interval details' })).toHaveTextContent('10000')
     expect(screen.getByRole('region', { name: 'Interval details' })).toHaveTextContent('P2')
     expect(ganttWidth(Number.MAX_SAFE_INTEGER, 320, 16, false)).toBeLessThanOrEqual(384000)
@@ -230,7 +233,7 @@ describe('playback and synchronization', () => {
       expect(eventPanel).toHaveTextContent(event.explanation)
       expect(eventPanel).toHaveTextContent(`sequence ${event.sequence}`)
     }
-    expect(container.querySelector('[data-gantt-segment="0"]')).toHaveClass('active-segment')
+    expect(container.querySelector('[data-gantt-segment="4"]')).toHaveClass('active-segment')
     expect(within(screen.getByRole('region', { name: 'MISSION STATUS' })).getByText('CPU RUNNING')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Previous Step' }))
     expect(eventPanel).toHaveTextContent(result.events[3].explanation)
@@ -244,7 +247,7 @@ describe('playback and synchronization', () => {
     const status = within(screen.getByRole('region', { name: 'MISSION STATUS' }))
     fireEvent.change(screen.getByLabelText('Seek simulation time'), { target: { value: '2' } })
     expect(status.getByText('CPU IDLE')).toBeInTheDocument()
-    expect(container.querySelector('[data-gantt-segment="0"]')).toHaveClass('active-segment')
+    expect(container.querySelector('[data-gantt-segment="2"]')).toHaveClass('active-segment')
     fireEvent.change(screen.getByLabelText('Seek simulation time'), { target: { value: '4' } })
     expect(status.getByText('CPU RUNNING')).toBeInTheDocument()
     expect(container.querySelector('[data-process-state="running"]')).toHaveTextContent('P1')
@@ -299,9 +302,9 @@ describe('real chart export', () => {
     const document = new DOMParser().parseFromString(xml, 'image/svg+xml')
     expect(document.querySelector('parsererror')).toBeNull()
     expect(document.documentElement.getAttribute('width')).toBe('1200')
-    expect(xml).toContain('P1: 0–5; duration 5')
-    expect(xml).toContain('P2: 5–8; duration 3')
-    expect(xml).toContain('P3: 8–12; duration 4')
+    expect(xml).toContain('P1: 0–1; duration 1')
+    expect(xml).toContain('P2: 5–6; duration 1')
+    expect(xml).toContain('P3: 8–9; duration 1')
     expect(xml).toContain('#E53935')
     const scale = ganttScale(0, 12, 1200)
     expect(xml).toContain(`x="${scale.x(8)}"`)

@@ -13,13 +13,12 @@ export function ganttScale(origin: number, end: number, width: number) {
     durationWidth: (duration: number) => duration * pixelsPerUnit }
 }
 
-export function ganttWidth(duration: number, available: number, zoom: number, fit: boolean, segmentCount = 0) {
+export function ganttWidth(duration: number, available: number, zoom: number, fit: boolean, segmentCount = 0, minimumUnitWidth = 56) {
   const minimum = Math.max(280, available)
-  // A dense schedule stays scrollable even in Fit mode instead of mounting
-  // tens of thousands of indistinguishable focus targets in one viewport.
-  const practical = segmentCount > 250 ? Math.min(384_000, segmentCount * 3 + GANTT_LEFT + GANTT_RIGHT) : minimum
-  const natural = Math.max(minimum, practical, Math.min(24_000, duration * 32 + GANTT_LEFT + GANTT_RIGHT))
-  return Math.max(280, Math.min(384_000, (fit ? Math.max(minimum, practical) : natural) * zoom))
+  // Unit cells remain readable even in Fit mode. Long charts use bounded time windows.
+  const unit = Math.max(minimumUnitWidth, fit ? 56 : 64 * zoom)
+  const natural = Math.max(minimum, duration * unit + GANTT_LEFT + GANTT_RIGHT, segmentCount ? 0 : minimum)
+  return Math.min(384_000, natural)
 }
 
 /** Hide colliding text without moving its actual time coordinate. */
